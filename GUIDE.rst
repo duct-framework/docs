@@ -89,7 +89,7 @@ So start the REPL with::
 
 At the prompt, we'll first load the development environment:
 
-.. code-block: clojure
+.. code-block:: clojure
 
   user=> (dev)
   :loaded
@@ -100,7 +100,7 @@ cause the REPL not to start.
 
 Once we're in the ``dev`` namespace we can start the application:
 
-.. code-block: clojure
+.. code-block:: clojure
 
   dev=> (go)
   :duct.server.http.jetty/starting-server {:port 3000}
