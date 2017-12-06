@@ -176,10 +176,11 @@ Let's add in a configuration entry with that name:
   [:duct.handler.static/ok :todo.handler/index]
   {:body {:entries "/entries"}}
 
-This time we're using a vector as the key. Vector keys inherit the
-properties of all the keywords contained in them; because the vector
-contains the key ``:duct.handler.static/ok``, the configuration entry
-produces a static handler.
+This time we're using a vector as the key; in Duct parlance, this is
+known as a *composite key*. Composite keys inherit the properties of
+all the keywords contained in them; because the vector contains the
+key ``:duct.handler.static/ok``, the configuration entry produces a
+static handler.
 
 Let's apply this change to the application. Go to back to the REPL and
 run:
@@ -203,3 +204,66 @@ HTTP request to the web server, we now get the expected response::
   {
       "entries": "/entries"
   }
+
+
+Adding a Migration
+""""""""""""""""""
+
+We want to begin adding more dynamic routes, but before we can we need
+to create our database schema. Duct uses Ragtime_ for migrations, and
+each migration is defined in the configuration.
+
+Add two more keys to the configuration:
+
+.. code-block:: edn
+
+  :duct.migrator/ragtime
+  {:migrations [#ig/ref :todo.migration/create-entries]}
+
+  [:duct.migrator.ragtime/sql :todo.migration/create-entries]
+  {:up ["CREATE TABLE entries (id INTEGER PRIMARY KEY, content TEXT)"]
+   :down ["DROP TABLE entries"]}
+
+The ``:duct.migrator/ragtime`` key contains an ordered list of
+migrations. Individual migrations can be defined by including
+``:duct.migrator.ragtime/sql`` in a composite key. The ``:up`` and
+``:down`` options contains vectors of SQL to execute; the former to
+apply the migration, the latter to roll it back.
+
+To apply the migration we run ``reset`` again at the REPL:
+
+.. code-block:: clojure
+
+  user=> (reset)
+  :reloading ()
+  :duct.migrator.ragtime/applying :todo.migration/create-entries#b34248fc
+  :resumed
+
+Suppose after applying the migration we change our mind about the
+schema. We could write another migration, but if we haven't committed
+the code or deployed it to production it's often more convenient to
+edit the migration we have.
+
+Let's change the migration and rename the ``content`` column to
+``description``:
+
+.. code-block:: edn
+
+  [:duct.migrator.ragtime/sql :todo.migration/create-entries]
+  {:up ["CREATE TABLE entries (id INTEGER PRIMARY KEY, description TEXT)"]
+   :down ["DROP TABLE entries"]}
+
+Then ``reset``:
+
+.. code-block:: clojure
+
+  user=> (reset)
+  :reloading ()
+  :duct.migrator.ragtime/rolling-back :todo.migration/create-entries#b34248fc
+  :duct.migrator.ragtime/applying :todo.migration/create-entries#5c2bb12a
+  :resumed
+
+The old version of the migration is automatically rolled back, and the
+new version of the migration applied in its place.
+
+.. _Ragtime: https://github.com/weavejester/ragtime
