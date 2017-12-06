@@ -135,3 +135,71 @@ add any routes to the application.
 .. _curl:          https://curl.haxx.se/
 .. _wget:          https://www.gnu.org/software/wget/
 .. _HTTPie:        https://httpie.org/
+
+
+Adding a Route
+""""""""""""""
+
+Now that we have a running project, we can start making changes to
+it. Duct applications are built around an edn_ configuration file,
+which in this project is located at ``resources/todo/config.edn``:
+
+.. code-block:: edn
+
+  {:duct.core/project-ns  todo
+   :duct.core/environment :production
+
+   :duct.module/logging {}
+   :duct.module.web/api {}
+   :duct.module/sql {}
+
+   :duct.module/ataraxy
+   {}}
+
+We're going to start by adding in a static index route, and to do that
+we're going to add to the ``:duct.module/ataraxy`` key, since Ataraxy
+is our router:
+
+.. code-block:: edn
+
+  :duct.module/ataraxy
+  {[:get "/"] [:index]}
+
+This connects a route ``[:get "/"]`` with a result ``[:index]``. The
+Ataraxy module automatically looks for a Ring handler in the
+configuration with a matching name to pair with the result. Since the
+result key is ``:index``, the handler key is ``:todo.handler/index``.
+Let's add in a configuration entry with that name:
+
+.. code-block:: edn
+
+  [:duct.handler.static/ok :todo.handler/index]
+  {:body {:entries "/entries"}}
+
+This time we're using a vector as the key. Vector keys inherit the
+properties of all the keywords contained in them; because the vector
+contains the key ``:duct.handler.static/ok``, the configuration entry
+produces a static handler.
+
+Let's apply this change to the application. Go to back to the REPL and
+run:
+
+.. code-block:: clojure
+
+  user=> (reset)
+  :reloading (todo.main dev user)
+  :resumed
+
+This reloads the configuration and any changed files. When we send a
+HTTP request to the web server, we now get the expected response::
+
+  $ http :3000
+  HTTP/1.1 200 OK
+  Content-Length: 22
+  Content-Type: application/json; charset=utf-8
+  Date: Wed, 06 Dec 2017 13:28:52 GMT
+  Server: Jetty(9.2.21.v20170120)
+
+  {
+      "entries": "/entries"
+  }
