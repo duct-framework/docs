@@ -137,12 +137,19 @@ add any routes to the application.
 .. _HTTPie:        https://httpie.org/
 
 
-Adding a Route
-""""""""""""""
+Configuration
+~~~~~~~~~~~~~
 
-Now that we have a running project, we can start making changes to
-it. Duct applications are built around an edn_ configuration file,
-which in this project is located at ``resources/todo/config.edn``:
+Duct applications are built around an edn_ configuration file. This
+defines the structure and dependencies of the application. In the
+project we're writing in this guide, the configuration is located at:
+``resources/todo/config.edn``.
+
+
+Adding a Static Route
+"""""""""""""""""""""
+
+Let's take a look at the configuration file:
 
 .. code-block:: edn
 
