@@ -213,8 +213,8 @@ HTTP request to the web server, we now get the expected response::
   }
 
 
-Adding a Migration
-""""""""""""""""""
+Adding a Database Migration
+"""""""""""""""""""""""""""
 
 We want to begin adding more dynamic routes, but before we can we need
 to create our database schema. Duct uses Ragtime_ for migrations, and
@@ -274,3 +274,91 @@ The old version of the migration is automatically rolled back, and the
 new version of the migration applied in its place.
 
 .. _Ragtime: https://github.com/weavejester/ragtime
+
+
+Adding a Query Handler
+""""""""""""""""""""""
+
+Now that we have a database table, it's time to write some routes to
+query it. To do this, we're going to use a library called
+``duct/handler.sql``, which should be added to the ``:dependencies``
+key in your ``project.clj`` file:
+
+.. code-block:: clojure
+
+  [duct/handler.sql "0.3.1]
+
+Your dependencies should now look something like:
+
+.. code-block:: clojure
+
+  :dependencies [[org.clojure/clojure "1.9.0-RC1"]
+                 [duct/core "0.6.1"]
+                 [duct/handler "0.3.1"]
+                 [duct/module.logging "0.3.1"]
+                 [duct/module.web "0.6.3"]
+                 [duct/module.ataraxy "0.2.0"]
+                 [duct/module.sql "0.4.2"]
+                 [org.xerial/sqlite-jdbc "3.20.1"]]
+
+Adding dependencies is one of the few times we have to restart the
+REPL. So first we exit:
+
+.. code-block:: clojure
+
+  user=> (exit)
+  Bye for now!
+
+Then we restart::
+
+  $ lein repl
+
+And start the application running again:
+
+.. code-block:: clojure
+  user=> (dev)
+  :loaded
+  dev=> (go)
+  :duct.server.http.jetty/starting-server {:port 3000}
+  :initiated
+
+We can now turn back to the project configuration. Let's start by
+adding a new Ataraxy route:
+
+.. code-block:: edn
+
+  :duct.module/ataraxy
+  {[:get "/"]        [:index]
+   [:get "/entries"] [:entries/list]}
+
+As before, the result ``[:entries/list]`` needs to be paired with an
+appropriately named Ring handler. The Ataraxy module expects this
+handler to be named ``:todo.handler.entries/list``, so we'll use that
+name, along with the ``:duct.handler.sql/query`` key:
+
+.. code-block:: edn
+
+  [:duct.handler.sql/query :todo.handler.entries/list]
+  {:sql ["SELECT * FROM entries"]}
+
+Once the handler is defined in the configuration, we can ``reset``:
+
+.. code-block:: clojure
+
+  user=> (reset)
+  :reloading (todo.main dev user)
+  :resumed
+
+Then we check the route by sending a HTTP request to it::
+
+  $ http :3000/entries
+  HTTP/1.1 200 OK
+  Content-Length: 2
+  Content-Type: application/json; charset=utf-8
+  Date: Thu, 07 Dec 2017 10:13:34 GMT
+  Server: Jetty(9.2.21.v20170120)
+
+  []
+
+We get a valid, though empty response. This makes sense, as we've yet
+to populate the ``entries`` table with any data.
