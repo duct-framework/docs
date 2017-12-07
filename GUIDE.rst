@@ -1,5 +1,5 @@
-Duct
-====
+Guide to the Duct Framework
+===========================
 
 Preface
 ~~~~~~~
