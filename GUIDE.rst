@@ -276,8 +276,8 @@ new version of the migration applied in its place.
 .. _Ragtime: https://github.com/weavejester/ragtime
 
 
-Adding a Query Handler
-""""""""""""""""""""""
+Adding a Query Route
+""""""""""""""""""""
 
 Now that we have a database table, it's time to write some routes to
 query it. To do this, we're going to use a library called
@@ -362,3 +362,71 @@ Then we check the route by sending a HTTP request to it::
 
 We get a valid, though empty response. This makes sense, as we've yet
 to populate the ``entries`` table with any data.
+
+
+Adding an Update Route
+""""""""""""""""""""""
+
+Next we'd like to add a route that updates the database. Again we're
+going to be making use of the ``duct/handler.sql`` library, but both
+the route and handler are going to be more complex.
+
+First, the new route:
+
+.. code-block:: edn
+
+  :duct.module/ataraxy
+  {[:get "/"]        [:index]
+   [:get "/entries"] [:entries/list]
+
+   [:post "/entries" {{:keys [description]} :body-params}]
+   [:entries/create description]}
+
+The new Ataraxy route not only matches the method and URI of the
+request, it also destructures the request body and places the
+description of the todo entry into the result.
+
+When we come to write the associated handler, we need some way of
+getting the information from the result. Ataraxy places the result
+into the ``:ataraxy/result`` key on the request map, so we can
+destructure the request to find the description of the new entry:
+
+.. code-block:: edn
+
+  [:duct.handler.sql/insert :todo.handler.entries/create]
+  {:request {[_ description] :ataraxy/result}
+   :sql     ["INSERT INTO entries (description) VALUES (?)" description]}
+
+Next we ``reset``:
+
+.. code-block:: clojure
+
+  user=> (reset)
+  :reloading (todo.main dev user)
+  :resumed
+
+And test::
+
+  $ http post :3000/entries description="Write Duct guide"
+  HTTP/1.1 201 Created
+  Content-Length: 0
+  Content-Type: application/octet-stream
+  Date: Thu, 07 Dec 2017 11:29:46 GMT
+  Server: Jetty(9.2.21.v20170120)
+
+
+  $ http get :3000/entries
+  HTTP/1.1 200 OK
+  Content-Length: 43
+  Content-Type: application/json; charset=utf-8
+  Date: Thu, 07 Dec 2017 11:29:51 GMT
+  Server: Jetty(9.2.21.v20170120)
+
+  [
+      {
+          "description": "Write Duct guide",
+          "id": 1
+      }
+  ]
+
+We can now have the bare bones of a useful application.
