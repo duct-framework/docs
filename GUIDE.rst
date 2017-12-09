@@ -294,7 +294,7 @@ Your dependencies should now look something like:
 
   :dependencies [[org.clojure/clojure "1.9.0-RC1"]
                  [duct/core "0.6.1"]
-                 [duct/handler "0.3.1"]
+                 [duct/handler.sql "0.3.1"]
                  [duct/module.logging "0.3.1"]
                  [duct/module.web "0.6.3"]
                  [duct/module.ataraxy "0.2.0"]
