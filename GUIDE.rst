@@ -430,3 +430,144 @@ And test::
   ]
 
 We can now have the bare bones of a useful application.
+
+
+Becoming More RESTful
+"""""""""""""""""""""
+
+We can now GET and POST to lists of entries for our Todo application,
+but ideally we'd also like to DELETE particular entries as well. In
+order to do that, each entry needs to have a distinct URI.
+
+Let's start by adding some hypertext references to our list handler:
+
+.. code-block:: edn
+
+  [:duct.handler.sql/query :todo.handler.entries/list]
+  {:sql   ["SELECT * FROM entries"]
+   :hrefs {:href "/entries/{id}"}}
+
+The ``:hrefs`` option allows hypertext references to be added to the
+response using `URI templates`_. If we ``reset``:
+
+.. code-block:: clojure
+
+  user=> (reset)
+  :reloading (todo.main dev user)
+  :resumed
+
+And test::
+
+  $ http :3000/entries
+  HTTP/1.1 200 OK
+  Content-Length: 63
+  Content-Type: application/json; charset=utf-8
+  Date: Thu, 07 Dec 2017 21:13:20 GMT
+  Server: Jetty(9.2.21.v20170120)
+
+  [
+      {
+          "description": "Write Duct guide",
+          "href": "/entries/1",
+          "id": 1
+      }
+  ]
+
+We can see that each list entry now has a new key. Let's write two new
+Ataraxy routes:
+
+.. code-block:: edn
+
+  :duct.module/ataraxy
+  {[:get "/"]        [:index]
+   [:get "/entries"] [:entries/list]
+
+   [:post "/entries" {{:keys [description]} :body-params}]
+   [:entries/create description]
+
+   [:get    "/entries/" id] [:entries/find    ^int id]
+   [:delete "/entries/" id] [:entries/destroy ^int id]}
+
+These routes show how we can pull data out of the URI, and coerce it
+into a new type.
+
+The routes require associated handlers. As before, we'll make use of
+the `duct/handler.sql` library, using the `query-one` and `execute`
+handler types:
+
+  .. code-block:: edn
+
+  [:duct.handler.sql/query-one :todo.handler.entries/find]
+  {:request {[_ id] :ataraxy/result}
+   :sql     ["SELECT * FROM entries WHERE id = ?" id]
+   :hrefs   {:href "/entries/{id}"}}
+
+  [:duct.handler.sql/execute :todo.handler.entries/destroy]
+  {:request {[_ id] :ataraxy/result}
+   :sql     ["DELETE FROM entries WHERE id = ?" id]}
+
+
+We also want to improve the entry creation route and give it a
+`Location` header to the resource it creates:
+
+.. code-block:: edn
+
+  [:duct.handler.sql/insert :todo.handler.entries/create]
+  {:request  {[_ description] :ataraxy/result}
+   :sql      ["INSERT INTO entries (description) VALUES (?)" description]
+   :location "/entries/{last_insert_rowid}"}
+
+The `last_insert_rowid` is a resultset column specific to
+SQLite. Other databases will return the generated row ID in different
+ways.
+
+With all that done we `reset`:
+
+.. code-block:: clojure
+
+  user=> (reset)
+  :reloading ()
+  :resumed
+
+And test::
+
+  $ http :3000/entries/1
+  HTTP/1.1 200 OK
+  Content-Length: 61
+  Content-Type: application/json; charset=utf-8
+  Date: Sat, 09 Dec 2017 12:59:05 GMT
+  Server: Jetty(9.2.21.v20170120)
+
+  {
+      "description": "Write Duct guide",
+      "href": "/entries/1",
+      "id": 1
+  }
+
+  $ http delete :3000/entries/1
+  HTTP/1.1 204 No Content
+  Content-Type: application/octet-stream
+  Date: Sat, 09 Dec 2017 12:59:12 GMT
+  Server: Jetty(9.2.21.v20170120)
+
+
+  $ http :3000/entries/1
+  HTTP/1.1 404 Not Found
+  Content-Length: 21
+  Content-Type: application/json; charset=utf-8
+  Date: Sat, 09 Dec 2017 12:59:18 GMT
+  Server: Jetty(9.2.21.v20170120)
+
+  {
+      "error": "not-found"
+  }
+
+  $ http post :3000/entries description="Continue Duct guide"
+  HTTP/1.1 201 Created
+  Content-Length: 0
+  Content-Type: application/octet-stream
+  Date: Sat, 09 Dec 2017 13:18:46 GMT
+  Location: http://localhost:3000/entries/1
+  Server: Jetty(9.2.21.v20170120)
+
+.. _URI templates: https://tools.ietf.org/html/rfc6570
