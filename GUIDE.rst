@@ -495,7 +495,7 @@ The routes require associated handlers. As before, we'll make use of
 the `duct/handler.sql` library, using the `query-one` and `execute`
 handler types:
 
-  .. code-block:: edn
+.. code-block:: edn
 
   [:duct.handler.sql/query-one :todo.handler.entries/find]
   {:request {[_ id] :ataraxy/result}
