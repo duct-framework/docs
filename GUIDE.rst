@@ -194,7 +194,7 @@ run:
 
 .. code-block:: clojure
 
-  user=> (reset)
+  dev=> (reset)
   :reloading (todo.main dev user)
   :resumed
 
@@ -241,7 +241,7 @@ To apply the migration we run ``reset`` again at the REPL:
 
 .. code-block:: clojure
 
-  user=> (reset)
+  dev=> (reset)
   :reloading ()
   :duct.migrator.ragtime/applying :todo.migration/create-entries#b34248fc
   :resumed
@@ -264,7 +264,7 @@ Then ``reset``:
 
 .. code-block:: clojure
 
-  user=> (reset)
+  dev=> (reset)
   :reloading ()
   :duct.migrator.ragtime/rolling-back :todo.migration/create-entries#b34248fc
   :duct.migrator.ragtime/applying :todo.migration/create-entries#5c2bb12a
@@ -306,7 +306,7 @@ REPL. So first we exit:
 
 .. code-block:: clojure
 
-  user=> (exit)
+  dev=> (exit)
   Bye for now!
 
 Then we restart::
@@ -345,7 +345,7 @@ Once the handler is defined in the configuration, we can ``reset``:
 
 .. code-block:: clojure
 
-  user=> (reset)
+  dev=> (reset)
   :reloading (todo.main dev user)
   :resumed
 
@@ -401,7 +401,7 @@ Next we ``reset``:
 
 .. code-block:: clojure
 
-  user=> (reset)
+  dev=> (reset)
   :reloading (todo.main dev user)
   :resumed
 
@@ -452,7 +452,7 @@ response using `URI templates`_. If we ``reset``:
 
 .. code-block:: clojure
 
-  user=> (reset)
+  dev=> (reset)
   :reloading (todo.main dev user)
   :resumed
 
@@ -525,7 +525,7 @@ With all that done we `reset`:
 
 .. code-block:: clojure
 
-  user=> (reset)
+  dev=> (reset)
   :reloading ()
   :resumed
 
