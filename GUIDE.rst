@@ -773,3 +773,55 @@ We don't have any way of visualizing this information yet, so we need
 to take a look at the database.
 
 .. _key derivation function: https://en.wikipedia.org/wiki/Key_derivation_function
+
+
+Querying the Database
+"""""""""""""""""""""
+
+During development we likely want to query the database to ensure that
+the code we write is inserting the correct data. To make this process
+easier, we'll be adding to the ``dev`` namespace in
+``dev/src/dev.clj``.
+
+First, we want to require the ``clojure.java.jdbc`` namespace:
+
+.. code-block:: clojure
+
+  [clojure.java.jdbc :as jdbc]
+
+Next we want a way of getting a database connection. Duct stores the
+running system in the ``system`` var during development. This allows
+us to write a simple function to retrieve a JDBC database spec:
+
+.. code-block:: clojure
+
+  (defn db []
+    (-> system (ig/find-derived-1 :duct.database/sql) val :spec))
+
+Now that we can get the database, we can add a small function to help
+us query it:
+
+.. code-block:: clojure
+
+  (defn q [sql]
+    (jdbc/query (db) sql))
+
+Once these changes are made, we ``reset``:
+
+.. code-block:: clojure
+
+  dev=> (reset)
+  :reloading (dev)
+  :resumed
+
+Then try querying our ``users`` table:
+
+.. code-block:: clojure
+
+  dev=> (q "SELECT * FROM users")
+  ({:id 1,
+    :email "bob@example.com",
+    :password
+    "bcrypt+sha512$f4c1bc592ecd1869d0bf802f7c8f6e36$12$19a9ae3ed9118cb6cbfcd8c4a31aadb6b00162288b1fce50"})
+
+That certainly looks correct. We have an ID, email and an hashed password.
