@@ -571,3 +571,205 @@ And test::
   Server: Jetty(9.2.21.v20170120)
 
 .. _URI templates: https://tools.ietf.org/html/rfc6570
+
+
+Code
+~~~~
+
+So far we've seen how the configuration can be leveraged to produce
+applications in Duct. This works well when our needs are modest, but
+for most applications we're going to have to knuckle down and write
+some code.
+
+While defining handlers using data has advantages, it's important not
+to take this too far. Treat the configuration as the skeleton of your
+application, and the code as the muscles and organs that drive it.
+
+
+Adding Users
+""""""""""""
+
+So far our application has been the single-user variety. Let's change
+that by adding a ``users`` table. First we'll add a reference to a new
+migration in the configuration:
+
+.. code-block:: edn
+
+  :duct.migrator/ragtime
+  {:migrations [#ig/ref :todo.migration/create-entries
+                #ig/ref :todo.migration/create-users]}
+
+Then create the migration:
+
+.. code-block:: edn
+
+  [:duct.migrator.ragtime/sql :todo.migration/create-users]
+  {:up ["CREATE TABLE users (id INTEGER PRIMARY KEY, email TEXT UNIQUE, password TEXT)"]
+   :down ["DROP TABLE users"]}
+
+And ``reset`` to apply the new migration:
+
+.. code-block:: clojure
+
+  dev=> (reset)
+  :reloading ()
+  :duct.migrator.ragtime/applying :todo.migration/create-users#66d6b1f8
+  :resumed
+
+Now that we have a table to hold our users, we next need to provide a
+way for people to sign up to our web service. We could write a handler
+for this with the ``duct/handler.sql`` library, but good security
+practice tells us that we should avoid writing passwords directly to
+the database.
+
+Instead, we'll be writing our own handler function, one that secures
+the password with a `key derivation function`_ or KDF. To do this, we
+first need to introduce a new dependency to the project file:
+
+.. code-block:: clojure
+
+  [buddy/buddy-hashers "1.3.0"]
+
+This is the library that we'll use to supply our KDF. Once the
+dependency is in place, exit the REPL:
+
+.. code-block:: clojure
+
+  dev=> (exit)
+  Bye for now!
+
+Then restart::
+
+  $ lein repl
+
+And start the application:
+
+.. code-block:: clojure
+  user=> (dev)
+  :loaded
+  dev=> (go)
+  :duct.server.http.jetty/starting-server {:port 3000}
+  :initiated
+
+Next we want to add in an additional Ataraxy route that allows users
+to be created:
+
+.. code-block:: edn
+
+  :duct.module/ataraxy
+  {[:get "/"]        [:index]
+   [:get "/entries"] [:entries/list]
+
+   [:post "/entries" {{:keys [description]} :body-params}]
+   [:entries/create description]
+
+   [:get    "/entries/" id] [:entries/find    ^int id]
+   [:delete "/entries/" id] [:entries/destroy ^int id]
+
+   [:post "/users" {{:keys [email password]} :body-params}]
+   [:users/create email password]}
+
+And we next write the handler configuration:
+
+.. code-block:: edn
+
+  :todo.handler.users/create
+  {:db #ig/ref :duct.database/sql}
+
+You'll notice that this isn't a composite key; we're not using
+existing functionality, but instead we're going to write our own
+method.
+
+You might also notice that we're also including a reference to the
+database. All SQL database keys in Duct inherit from
+``:duct.database/sql``, so by using that key in the reference we're
+telling Duct to find the first available SQL database.
+
+You may wonder why the ``duct.handler.sql`` keys didn't include a
+database key. This is because they all inherit from the
+``:duct.module.sql/requires-db`` keyword, which is a indicator to the
+``:duct.module/sql`` module to automatically insert the reference. We
+could also do this, but for now we'll keep the reference explicit.
+
+It's now finally time to write the handler. The namespace of the
+keyword is ``todo.handler.users``, so we'll use that as the namespace
+for the code. Create a new file ``src/todo/handler/users.clj`` and add
+a namespace declaration:
+
+.. code-block:: clojure
+
+  (ns todo.handler.users
+    (:require [ataraxy.response :as response]
+              [buddy.hashers :as hashers]
+              [clojure.java.jdbc :as jdbc]
+              duct.database.sql
+              [integrant.core :as ig]))
+
+Naturally we need ``buddy.hashers`` for our KDF, and we need
+``clojure.java.jdbc`` because we're accessing the database. The
+``integrant.core`` namespace is necessary because we're writing an
+Integrant multimethod, but the purpose of ``ataraxy.response`` and
+``duct.database.sql`` might be less obvious.
+
+Let's create the function to insert the new user into the database,
+and return the ID of the newly created row:
+
+.. code-block:: clojure
+
+  (defprotocol Users
+    (create-user [db email password]))
+
+  (extend-protocol Users
+    duct.database.sql.Boundary
+    (create-user [{db :spec} email password]
+      (let [pw-hash (hashers/derive password)
+            results (jdbc/insert! db :users {:email email, :password pw-hash})]
+        (-> results ffirst val))))
+
+If you're new to Duct, you might be surprised that we're using a
+protocol here. Why not just write a function? Why are we writing a
+protocol, then implementing it against this mysterious
+``duct.database.sql.Boundary`` type?
+
+The answer is that we *could* use a function, and it would certainly
+save us a few lines, but by using a protocol we gain the capability to
+mock out the database for testing or development. Duct provides an
+empty 'boundary' record, ``duct.database.sql.Boundary``, for this
+purpose. This is why we need to require the ``duct.database.sql``
+namespace, or the record will not be loaded.
+
+Finally, we write the ``init-key`` method for our keyword:
+
+.. code-block:: clojure
+
+  (defmethod ig/init-key ::create [_ {:keys [db]}]
+    (fn [{[_ email password] :ataraxy/result}]
+      (let [id (create-user db email password)]
+        [::response/created (str "/users/" id)])))
+
+Ataraxy allows a vector to be returned instead of the usual Ring
+response map. This is both a convenience, and an abstraction. Ataraxy
+will turn this into a ``201 Created`` response map for you.
+
+Let's ``reset``:
+
+.. code-block:: clojure
+
+  dev=> (reset)
+  :reloading (todo.main todo.handler.users dev user)
+  :resumed
+
+Then test it out::
+
+  $ http post :3000/users email=bob@example.com password=hunter2
+  HTTP/1.1 201 Created
+  Content-Length: 0
+  Content-Type: application/octet-stream
+  Date: Mon, 11 Dec 2017 14:10:31 GMT
+  Location: http://localhost:3000/users/1
+  Server: Jetty(9.2.21.v20170120)
+
+We don't have any way of visualizing this information yet, so we need
+to take a look at the database.
+
+.. _key derivation function: https://en.wikipedia.org/wiki/Key_derivation_function
