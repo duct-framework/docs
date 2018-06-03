@@ -212,6 +212,7 @@ HTTP request to the web server, we now get the expected response::
       "entries": "/entries"
   }
 
+.. _edn: https://github.com/edn-format/edn
 
 Adding a Database Migration
 """""""""""""""""""""""""""
