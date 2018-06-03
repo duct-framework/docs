@@ -275,6 +275,17 @@ new version of the migration applied in its place.
 
 .. _Ragtime: https://github.com/weavejester/ragtime
 
+Running Database Migrations in Production
+"""""""""""""""""""""""""""""""""""""""""
+
+We can easily run migrations in production::
+
+  $ lein run :duct/migrator
+
+If you are using Heroku for deployment, this can easily be added to the release phase via your Procfile::
+
+  web: java -jar target/sstandalone.jar
+  release: lein run :duct/migrator
 
 Adding a Query Route
 """"""""""""""""""""
