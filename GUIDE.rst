@@ -297,7 +297,7 @@ key in your ``project.clj`` file:
 
 .. code-block:: clojure
 
-  [duct/handler.sql "0.3.1]
+  [duct/handler.sql "0.3.1"]
 
 Your dependencies should now look something like:
 
