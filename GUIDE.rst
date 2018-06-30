@@ -328,6 +328,7 @@ Then we restart::
 And start the application running again:
 
 .. code-block:: clojure
+
   user=> (dev)
   :loaded
   dev=> (go)
@@ -657,6 +658,7 @@ Then restart::
 And start the application:
 
 .. code-block:: clojure
+
   user=> (dev)
   :loaded
   dev=> (go)
