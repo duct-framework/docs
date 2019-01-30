@@ -67,7 +67,7 @@ This creates four files that should be kept out of source control::
 If you're using Git_, then these files are already added to your
 ``.gitignore`` file. If you're using another version control system,
 then you'll need to manually update your ignore files.
-  
+
 .. _SQLite:  https://sqlite.org/
 .. _Ataraxy: https://github.com/weavejester/ataraxy
 .. _Git:     https://git-scm.com/
@@ -153,41 +153,76 @@ Let's take a look at the configuration file:
 
 .. code-block:: edn
 
-  {:duct.core/project-ns  todo
-   :duct.core/environment :production
+  {:duct.profile/base
+   {:duct.core/project-ns todo
+
+    :duct.router/ataraxy
+    {:routes {}}}
+
+   :duct.profile/dev   #duct/include "dev"
+   :duct.profile/local #duct/include "local"
+   :duct.profile/prod  {}
 
    :duct.module/logging {}
    :duct.module.web/api {}
-   :duct.module/sql {}
+   :duct.module/sql {}}
 
-   :duct.module/ataraxy
-   {}}
+The configuration is divided into *profile* and *module*
+components. Profiles are where we'll store the majority of our
+configuration, and the base profile, ``:duct.profile/base``, is where
+we're going to add the majority of our configuration.
 
-We're going to start by adding in a static index route, and to do that
-we're going to add to the ``:duct.module/ataraxy`` key, since Ataraxy
-is our router:
+
+We're going to begin by adding in a static index route, and to do that
+we're going to add to the ``:duct.router/ataraxy`` key:
 
 .. code-block:: edn
 
-  :duct.module/ataraxy
-  {[:get "/"] [:index]}
+  :duct.router/ataraxy
+  {:routes {[:get "/"] [:todo.handler/index]}}
 
-This connects a route ``[:get "/"]`` with a result ``[:index]``. The
-Ataraxy module automatically looks for a Ring handler in the
-configuration with a matching name to pair with the result. Since the
-result key is ``:index``, the handler key is ``:todo.handler/index``.
-Let's add in a configuration entry with that name:
+This connects a route ``[:get "/"]`` with a result
+``[:todo.handler/index]``. As a shortcut, the Ataraxy router
+automatically looks for a Ring handler in the configuration with a
+matching name to pair with the result. We could also have written:
+
+.. code-block:: edn
+
+  :duct.router/ataraxy
+  {:routes   {[:get "/"] [:todo.handler/index]}
+   :handlers {:todo.handler/index #ig/ref :todo.handler/index}}
+
+This means the same thing. The ``:duct.router/ataraxy`` component is smart
+enough to connect a routing result to a handler automatically, if one
+is not specified.
+
+Next we need to actually add a Ring handler. This will handle an
+incoming HTTP request and return a HTTP response. Under the
+``:duct.profile/base`` key, add in another configuration entry:
 
 .. code-block:: edn
 
   [:duct.handler.static/ok :todo.handler/index]
   {:body {:entries "/entries"}}
 
-This time we're using a vector as the key; in Duct parlance, this is
-known as a *composite key*. Composite keys inherit the properties of
-all the keywords contained in them; because the vector contains the
-key ``:duct.handler.static/ok``, the configuration entry produces a
-static handler.
+Your base profile should now look like:
+
+.. code-block:: edn
+
+  :duct.profile/base
+  {:duct.core/project-ns todo
+
+   :duct.router/ataraxy
+   {:routes {[:get "/"] [:todo.handler/index]}}
+
+   [:duct.handler.static/ok :todo.handler/index]
+   {:body {:entries "/entries"}}}
+
+Notice that this time we're using a vector of two keywords as a key.
+In Duct parlance, this is known as a *composite key*. Composite keys
+inherit the properties of all the keywords contained in them; because
+the vector contains the key ``:duct.handler.static/ok``, it inherits
+the properties of a static handler.
 
 Let's apply this change to the application. Go to back to the REPL and
 run:
@@ -221,7 +256,7 @@ We want to begin adding more dynamic routes, but before we can we need
 to create our database schema. Duct uses Ragtime_ for migrations, and
 each migration is defined in the configuration.
 
-Add two more keys to the configuration:
+Add two more keys to the base profile:
 
 .. code-block:: edn
 
@@ -283,7 +318,8 @@ We can easily run migrations in production::
 
   $ lein run :duct/migrator
 
-If you are using Heroku for deployment, this can easily be added to the release phase via your Procfile::
+If you are using Heroku for deployment, this can be added to the
+release phase via your Procfile::
 
   web: java -jar target/sstandalone.jar
   release: lein run :duct/migrator
@@ -298,20 +334,20 @@ key in your ``project.clj`` file:
 
 .. code-block:: clojure
 
-  [duct/handler.sql "0.3.1"]
+  [duct/handler.sql "0.4.0"]
 
 Your dependencies should now look something like:
 
 .. code-block:: clojure
 
-  :dependencies [[org.clojure/clojure "1.9.0-RC1"]
-                 [duct/core "0.6.1"]
-                 [duct/handler.sql "0.3.1"]
-                 [duct/module.logging "0.3.1"]
-                 [duct/module.web "0.6.3"]
-                 [duct/module.ataraxy "0.2.0"]
-                 [duct/module.sql "0.4.2"]
-                 [org.xerial/sqlite-jdbc "3.20.1"]]
+  :dependencies [[org.clojure/clojure "1.10.0"]
+                 [duct/core "0.7.0"]
+                 [duct/handler.sql "0.4.0"]
+                 [duct/module.logging "0.4.0"]
+                 [duct/module.web "0.7.0"]
+                 [duct/module.ataraxy "0.3.0"]
+                 [duct/module.sql "0.5.0"]
+                 [org.xerial/sqlite-jdbc "3.25.2"]]
 
 Adding dependencies is one of the few times we have to restart the
 REPL. So first we exit:
@@ -340,14 +376,17 @@ adding a new Ataraxy route:
 
 .. code-block:: edn
 
-  :duct.module/ataraxy
-  {[:get "/"]        [:index]
-   [:get "/entries"] [:entries/list]}
+  :duct.router/ataraxy
+  {:routes
+   {[:get "/"]        [:todo.handler/index]
+    [:get "/entries"] [:todo.handler.entries/list]}}
 
-As before, the result ``[:entries/list]`` needs to be paired with an
-appropriately named Ring handler. The Ataraxy module expects this
-handler to be named ``:todo.handler.entries/list``, so we'll use that
-name, along with the ``:duct.handler.sql/query`` key:
+As before, we'll need to create a handler for this route, which should
+have the key: ``:todo.handler.entries/list``. Rather than deriving
+from a static handler, this time we'll derive from the
+``:duct.handler.sql/query`` key.
+
+Place the following in your base profile:
 
 .. code-block:: edn
 
@@ -384,16 +423,17 @@ Next we'd like to add a route that updates the database. Again we're
 going to be making use of the ``duct/handler.sql`` library, but both
 the route and handler are going to be more complex.
 
-First, the new route:
+First, add a new POST route:
 
 .. code-block:: edn
 
-  :duct.module/ataraxy
-  {[:get "/"]        [:index]
-   [:get "/entries"] [:entries/list]
+  :duct.router/ataraxy
+  {:routes
+   {[:get "/"]        [:todo.handler/index]
+    [:get "/entries"] [:todo.handler.entries/list]
 
-   [:post "/entries" {{:keys [description]} :body-params}]
-   [:entries/create description]}
+    [:post "/entries" {{:keys [description]} :body-params}]
+    [:todo.handler.entries/create description]}}
 
 The new Ataraxy route not only matches the method and URI of the
 request, it also destructures the request body and places the
@@ -491,15 +531,16 @@ Ataraxy routes:
 
 .. code-block:: edn
 
-  :duct.module/ataraxy
-  {[:get "/"]        [:index]
-   [:get "/entries"] [:entries/list]
+  :duct.router/ataraxy
+  {:routes
+   {[:get "/"]        [:todo.handler/index]
+    [:get "/entries"] [:todo.handler.entries/list]
 
-   [:post "/entries" {{:keys [description]} :body-params}]
-   [:entries/create description]
+    [:post "/entries" {{:keys [description]} :body-params}]
+    [:todo.handler.entries/create description]
 
-   [:get    "/entries/" id] [:entries/find    ^int id]
-   [:delete "/entries/" id] [:entries/destroy ^int id]}
+    [:get    "/entries/" id] [:todo.handler.entries/find    ^int id]
+    [:delete "/entries/" id] [:todo.handler.entries/destroy ^int id]}}
 
 These routes show how we can pull data out of the URI, and coerce it
 into a new type.
@@ -612,7 +653,7 @@ migration in the configuration:
   {:migrations [#ig/ref :todo.migration/create-entries
                 #ig/ref :todo.migration/create-users]}
 
-Then create the migration:
+Then create the migration and add it to the base profile:
 
 .. code-block:: edn
 
@@ -670,20 +711,22 @@ to be created:
 
 .. code-block:: edn
 
-  :duct.module/ataraxy
-  {[:get "/"]        [:index]
-   [:get "/entries"] [:entries/list]
+  :duct.router/ataraxy
+  {:routes
+   {[:get "/"]        [:todo.handler/index]
+    [:get "/entries"] [:todo.handler.entries/list]
 
-   [:post "/entries" {{:keys [description]} :body-params}]
-   [:entries/create description]
+    [:post "/entries" {{:keys [description]} :body-params}]
+    [:todo.handler.entries/create description]
 
-   [:get    "/entries/" id] [:entries/find    ^int id]
-   [:delete "/entries/" id] [:entries/destroy ^int id]
+    [:get    "/entries/" id] [:todo.handler.entries/find    ^int id]
+    [:delete "/entries/" id] [:todo.handler.entries/destroy ^int id]
 
-   [:post "/users" {{:keys [email password]} :body-params}]
-   [:users/create email password]}
+    [:post "/users" {{:keys [email password]} :body-params}]
+    [:todo.handler.users/create email password]}}
 
-And we next write the handler configuration:
+And we next write the handler configuration, adding to the base
+profile as before:
 
 .. code-block:: edn
 
@@ -797,7 +840,8 @@ the code we write is inserting the correct data. To make this process
 easier, we'll be adding to the ``dev`` namespace in
 ``dev/src/dev.clj``.
 
-First, we want to require the ``clojure.java.jdbc`` namespace:
+First, we want to add a new require for the the ``clojure.java.jdbc``
+namespace:
 
 .. code-block:: clojure
 
